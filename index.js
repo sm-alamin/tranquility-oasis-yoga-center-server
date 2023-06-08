@@ -26,8 +26,13 @@ async function run() {
     client.connect();
 
     const courseCollection = client.db("courseDb").collection("courseInfo");
-  
-    
+
+    //read
+    app.get("/courses", async (req, res) => {
+      const cursor = courseCollection.find();
+      const result = await cursor.toArray();
+      res.send(result);
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
@@ -47,5 +52,7 @@ app.get("/", (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Tranquility oasis yoga center Server is running on port ${port}`);
+  console.log(
+    `Tranquility oasis yoga center Server is running on port ${port}`
+  );
 });
