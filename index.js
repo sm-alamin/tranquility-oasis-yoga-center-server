@@ -29,7 +29,18 @@ async function run() {
 
     //read
     app.get("/courses", async (req, res) => {
-      const cursor = courseCollection.find();
+      const limit = parseInt(req.query.limit);
+    
+      let cursor;
+      if (limit && limit > 0) {
+        cursor = courseCollection
+          .find()
+          .sort({ number_of_enrolled_students: -1 })
+          .limit(limit);
+      } else {
+        cursor = courseCollection.find();
+      }
+    
       const result = await cursor.toArray();
       res.send(result);
     });
