@@ -25,9 +25,10 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     client.connect();
 
-    const courseCollection = client.db("courseDb").collection("courseInfo");
+    const courseCollection = client.db("yogaDb").collection("courseInfo");
+    const instructorsCollection = client.db("yogaDb").collection("instructorsInfo");
 
-    //read
+    //read-courses
     app.get("/courses", async (req, res) => {
       const limit = parseInt(req.query.limit);
     
@@ -39,6 +40,24 @@ async function run() {
           .limit(limit);
       } else {
         cursor = courseCollection.find();
+      }
+    
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
+    //read-instructor
+    app.get("/instructors", async (req, res) => {
+      const limit = parseInt(req.query.limit);
+    
+      let cursor;
+      if (limit && limit > 0) {
+        cursor = instructorsCollection
+          .find()
+          .sort({ total_students: -1 })
+          .limit(limit);
+      } else {
+        cursor = instructorsCollection.find();
       }
     
       const result = await cursor.toArray();
