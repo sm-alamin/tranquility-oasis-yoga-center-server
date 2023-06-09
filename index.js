@@ -26,12 +26,15 @@ async function run() {
     client.connect();
 
     const courseCollection = client.db("yogaDb").collection("courseInfo");
-    const instructorsCollection = client.db("yogaDb").collection("instructorsInfo");
+    const instructorsCollection = client
+      .db("yogaDb")
+      .collection("instructorsInfo");
+      const cartCollection = client.db("yogaDb").collection("carts");
 
     //read-courses
     app.get("/courses", async (req, res) => {
       const limit = parseInt(req.query.limit);
-    
+
       let cursor;
       if (limit && limit > 0) {
         cursor = courseCollection
@@ -41,7 +44,7 @@ async function run() {
       } else {
         cursor = courseCollection.find();
       }
-    
+
       const result = await cursor.toArray();
       res.send(result);
     });
@@ -49,7 +52,7 @@ async function run() {
     //read-instructor
     app.get("/instructors", async (req, res) => {
       const limit = parseInt(req.query.limit);
-    
+
       let cursor;
       if (limit && limit > 0) {
         cursor = instructorsCollection
@@ -59,16 +62,33 @@ async function run() {
       } else {
         cursor = instructorsCollection.find();
       }
-    
+
       const result = await cursor.toArray();
       res.send(result);
     });
+    // cart collection get apis
+    app.get("/carts", async (req, res) => {
+      const email = req.query.email;
 
-    //cart post api
-    app.post('/carts', async (req, res) => {
+      if (!email) {
+        res.send([]);
+      }
+      const query = { email: email };
+      const result = await cartCollection.find(query).toArray();
+      res.send(result);
+    });
+    //cart collection post api
+    app.post("/carts", async (req, res) => {
       const item = req.body;
       console.log(item);
       const result = await cartCollection.insertOne(item);
+      res.send(result);
+    });
+    //cart collection delete api
+    app.delete('/carts/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await cartCollection.deleteOne(query);
       res.send(result);
     })
 
