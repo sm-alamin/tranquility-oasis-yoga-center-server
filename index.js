@@ -24,14 +24,34 @@ async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
     client.connect();
-
+    //users db
+    const usersCollection = client.db("yogaDb").collection("usersInfo");
+    //course db
     const courseCollection = client.db("yogaDb").collection("courseInfo");
+    //instructors db
     const instructorsCollection = client
       .db("yogaDb")
       .collection("instructorsInfo");
-      const cartCollection = client.db("yogaDb").collection("carts");
+    const cartCollection = client.db("yogaDb").collection("carts");
 
-    //read-courses
+    //user related api
+
+    //user post api
+    app.post('/users', async (req, res) => {
+      const user = req.body;
+      const query = { email: user.email }
+      const existingUser = await usersCollection.findOne(query);
+
+      if (existingUser) {
+        return res.send({ message: 'user already exists' })
+      }
+
+      const result = await usersCollection.insertOne(user);
+      res.send(result);
+    });
+
+    //Class related api
+    //read class data
     app.get("/courses", async (req, res) => {
       const limit = parseInt(req.query.limit);
 
@@ -49,7 +69,8 @@ async function run() {
       res.send(result);
     });
 
-    //read-instructor
+    //Class related api
+    //read instructor data
     app.get("/instructors", async (req, res) => {
       const limit = parseInt(req.query.limit);
 
@@ -66,6 +87,8 @@ async function run() {
       const result = await cursor.toArray();
       res.send(result);
     });
+
+    //cart collection api
     // cart collection get apis
     app.get("/carts", async (req, res) => {
       const email = req.query.email;
@@ -85,12 +108,12 @@ async function run() {
       res.send(result);
     });
     //cart collection delete api
-    app.delete('/carts/:id', async (req, res) => {
+    app.delete("/carts/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await cartCollection.deleteOne(query);
       res.send(result);
-    })
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
