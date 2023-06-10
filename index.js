@@ -192,6 +192,13 @@ async function run() {
       const result = await courseCollection.insertOne(newClass)
       res.send(result);
     })
+    //delete class data
+    app.delete('/courses/:id', verifyJWT, verifyInstructor, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) }
+      const result = await courseCollection.deleteOne(query);
+      res.send(result);
+    })
 
     //Class related api
     //read instructor data
