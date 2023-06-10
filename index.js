@@ -64,7 +64,7 @@ async function run() {
 
       res.send({ token });
     });
-    // Warning: use verifyJWT before using verifyAdmin
+    // verify admin
     const verifyAdmin = async (req, res, next) => {
       const email = req.decoded.email;
       const query = { email: email };
@@ -77,15 +77,28 @@ async function run() {
       next();
     };
 
+    //verify instructor
+    const verifyInstructor = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      if (user?.role !== "instructor") {
+        return res
+          .status(403)
+          .send({ error: true, message: "forbidden message" });
+      }
+      next();
+    };
+
     //user related api
 
-    //users get api
+    // Get all users (admin only)
     app.get("/users", verifyJWT, verifyAdmin, async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
     });
 
-    //user post api
+    //Create a user
     app.post("/users", async (req, res) => {
       const user = req.body;
       const query = { email: user.email };
@@ -99,7 +112,7 @@ async function run() {
       res.send(result);
     });
 
-    // check admin
+    // Check if a user is an admin
     app.get("/users/admin/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
 
@@ -112,7 +125,16 @@ async function run() {
       const result = { admin: user?.role === "admin" };
       res.send(result);
     });
-    //users patch api
+    // Check if a user is an instructor
+    app.get("/users/instructor/:email", verifyJWT, async (req, res) => {
+      const email = req.params.email;
+
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      const result = { instructor: user?.role === "instructor" };
+      res.send(result);
+    });
+    //Update user role to "admin"
     app.patch("/users/admin/:id", async (req, res) => {
       const id = req.params.id;
       console.log(id);
@@ -126,19 +148,25 @@ async function run() {
       const result = await usersCollection.updateOne(filter, updateDoc);
       res.send(result);
     });
-    // Update user role to "instructor"
-    app.patch("/users/instructor/:id", async (req, res) => {
-      const id = req.params.id;
-      const filter = { _id: new ObjectId(id) };
-      const updateDoc = {
-        $set: {
-          role: "instructor",
-        },
-      };
 
-      const result = await usersCollection.updateOne(filter, updateDoc);
-      res.send(result);
-    });
+    //  Update user role to "instructor"
+    app.patch(
+      "/users/instructor/:id",
+      verifyJWT,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        const updateDoc = {
+          $set: {
+            role: "instructor",
+          },
+        };
+
+        const result = await usersCollection.updateOne(filter, updateDoc);
+        res.send(result);
+      }
+    );
 
     //Class related api
     //read class data
@@ -179,7 +207,7 @@ async function run() {
     });
 
     //cart collection api
-    // cart collection get apis
+    // Get cart items for a specific email
     app.get("/carts", async (req, res) => {
       const email = req.query.email;
 
@@ -190,14 +218,14 @@ async function run() {
       const result = await cartCollection.find(query).toArray();
       res.send(result);
     });
-    //cart collection post api
+    //Add an item to the cart
     app.post("/carts", async (req, res) => {
       const item = req.body;
       console.log(item);
       const result = await cartCollection.insertOne(item);
       res.send(result);
     });
-    //cart collection delete api
+    //Delete an item from the cart
     app.delete("/carts/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
