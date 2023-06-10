@@ -192,6 +192,31 @@ async function run() {
       const result = await courseCollection.insertOne(newClass)
       res.send(result);
     })
+     //common api to get all classes by id
+     app.get("/courses/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await courseCollection.findOne(query);
+      res.send(result);
+    });
+    //update class data
+    app.patch("/courses/:id",verifyJWT, verifyInstructor, async (req, res) => {
+      const id = req.params.id;
+      const classInfo = req.body;
+      console.log(id, classInfo);
+      const filter = { _id: new ObjectId(id) };
+      const options = { upsert: true };
+      const updatedClassInfo = {
+        $set: {
+          class_name: classInfo.class_name,
+          price: classInfo.price,
+          available_seats: classInfo.available_seats,
+          image: classInfo.image,
+        },
+      };
+      const result = await courseCollection.updateOne(filter, updatedClassInfo, options);
+      res.send(result);
+    });
     //delete class data
     app.delete('/courses/:id', verifyJWT, verifyInstructor, async (req, res) => {
       const id = req.params.id;
