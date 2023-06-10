@@ -186,6 +186,12 @@ async function run() {
       const result = await cursor.toArray();
       res.send(result);
     });
+    //post class data
+    app.post('/courses', verifyJWT, verifyInstructor, async (req, res) => {
+      const newClass = req.body;
+      const result = await courseCollection.insertOne(newClass)
+      res.send(result);
+    })
 
     //Class related api
     //read instructor data
