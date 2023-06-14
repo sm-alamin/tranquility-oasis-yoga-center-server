@@ -91,6 +91,8 @@ async function run() {
       }
       next();
     };
+    //verify instructor
+    
 
     //user related api
 
@@ -105,12 +107,21 @@ async function run() {
       const user = req.body;
       const query = { email: user.email };
       const existingUser = await usersCollection.findOne(query);
-
+    
       if (existingUser) {
         return res.send({ message: "user already exists" });
       }
-
+    
+      user.role = "";
+    
       const result = await usersCollection.insertOne(user);
+      res.send(result);
+    });
+
+    app.delete("/users/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await usersCollection.deleteOne(query);
       res.send(result);
     });
 
@@ -136,6 +147,7 @@ async function run() {
       const result = { instructor: user?.role === "instructor" };
       res.send(result);
     });
+    
     //Update user role to "admin"
     app.patch("/users/admin/:id", async (req, res) => {
       const id = req.params.id;
@@ -154,8 +166,6 @@ async function run() {
     //  Update user role to "instructor"
     app.patch(
       "/users/instructor/:id",
-      verifyJWT,
-      verifyAdmin,
       async (req, res) => {
         const id = req.params.id;
         const filter = { _id: new ObjectId(id) };
@@ -189,11 +199,16 @@ async function run() {
       res.send(result);
     });
     //post class data
-    app.post("/courses", verifyJWT, verifyInstructor, async (req, res) => {
-      const newClass = req.body;
+    app.post("/courses", verifyJWT, async (req, res) => {
+      const newClass = {
+        ...req.body,
+        status: "pending", 
+        total_enrolled_student: 0 
+      };
       const result = await courseCollection.insertOne(newClass);
       res.send(result);
     });
+    
     //common api to get all classes by id
     app.get("/courses/:id", async (req, res) => {
       const id = req.params.id;
@@ -201,29 +216,95 @@ async function run() {
       const result = await courseCollection.findOne(query);
       res.send(result);
     });
-    //update class data
-    app.patch("/courses/:id", verifyJWT, verifyInstructor, async (req, res) => {
+    app.post('/courses/:id/feedback', async (req, res) => {
       const id = req.params.id;
-      const classInfo = req.body;
-      console.log(id, classInfo);
+      const { message } = req.body;
+    
+      try {
+        // Update the course with the provided ID and set the feedback message
+        await courseCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { feedback: message } }
+        );
+        res.sendStatus(200); // Send a success response
+      } catch (error) {
+        console.error('Failed to update course with feedback:', error);
+        res.status(500).send('Internal server error');
+      }
+    });
+    
+    app.patch("/courses/:id", async (req, res) => {
+      const id = req.params.id;
+      const { operation, ...data } = req.body; // Extract the operation from the request body
+    
       const filter = { _id: new ObjectId(id) };
       const options = { upsert: true };
-      const updatedClassInfo = {
-        $set: {
-          class_name: classInfo.class_name,
-          price: classInfo.price,
-          available_seats: classInfo.available_seats,
-          image: classInfo.image,
-        },
-      };
-      const result = await courseCollection.updateOne(
-        filter,
-        updatedClassInfo,
-        options
-      );
-      res.send(result);
+      let updatedCourses = {};
+    
+      // Based on the operation, set the appropriate fields in updatedCourses
+      switch (operation) {
+        case 'approve':
+          updatedCourses = {
+            $set: {
+              status: 'approved'
+            },
+          };
+          break;
+        case 'deny':
+          updatedCourses = {
+            $set: {
+              status: 'denied'
+            },
+          };
+          break;
+        case 'feedback':
+          const { message } = data;
+          updatedCourses = {
+            $set: {
+              feedback: message
+            },
+          };
+          break;
+        // Add more cases for other operations if needed
+        default:
+          return res.status(400).send('Invalid operation');
+      }
+    
+      try {
+        const result = await courseCollection.updateOne(filter, updatedCourses, options);
+        res.send(result);
+      } catch (error) {
+        console.error('Failed to update class:', error);
+        res.status(500).send('Internal server error');
+      }
     });
-
+    
+    
+    //update class data
+    // app.patch("/courses/:id", verifyJWT, async (req, res) => {
+    //   const id = req.params.id;
+    //   const classInfo = req.body;
+    //   console.log(id, classInfo);
+    //   const filter = { _id: new ObjectId(id) };
+    //   const options = { upsert: true };
+    //   const updatedClassInfo = {
+    //     $set: {
+    //       class_name: classInfo.class_name,
+    //       price: classInfo.price,
+    //       available_seats: classInfo.available_seats,
+    //       image: classInfo.image,
+    //     },
+    //   };
+    //   const result = await courseCollection.updateOne(
+    //     filter,
+    //     updatedClassInfo,
+    //     options
+    //   );
+    //   res.send(result);
+    // });
+    
+    
+    
     //delete class data
     app.delete(
       "/courses/:id",
@@ -297,16 +378,46 @@ async function run() {
       });
     });
 
+    // payment related get api
+    app.get('/payments', async (req, res) => {
+      const email = req.query.email;
+    
+      if (!email) {
+        res.send([]);
+      }
+    
+      const query = { email: email };
+      const sort = { date: -1 }; // Sort by the "date" field in descending order
+      const result = await paymentCollection.find(query).sort(sort).toArray();
+      res.send(result);
+    });
+    
     // payment related api
     app.post('/payments', verifyJWT, async (req, res) => {
-      const payment = req.body;
-      const insertResult = await paymentCollection.insertOne(payment);
-
-      const query = { _id: { $in: payment.cartItems.map(id => new ObjectId(id)) } }
-      const deleteResult = await cartCollection.deleteMany(query)
-
-      res.send({ insertResult, deleteResult });
+      try {
+        const payment = req.body;
+        const insertResult = await paymentCollection.insertOne(payment);
+    
+        const cartItemId = payment.cartItemId; 
+    
+        if (!cartItemId) {
+          throw new Error('No cart item ID provided');
+        }
+    
+        const deleteResult = await cartCollection.deleteOne({
+          _id: ObjectId(cartItemId)
+        });
+    
+        if (deleteResult.deletedCount === 0) {
+          throw new Error('Cart item not found');
+        }
+        res.send({ insertResult, deleteResult });
+      } catch (error) {
+        res.status(500).send({ error: error.message });
+      }
     })
+    
+    
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
