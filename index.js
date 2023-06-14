@@ -392,7 +392,31 @@ async function run() {
       res.send(result);
     });
     
-    // payment related api
+    // payment post api
+    // app.post('/payments', verifyJWT, async (req, res) => {
+    //   try {
+    //     const payment = req.body;
+    //     const insertResult = await paymentCollection.insertOne(payment);
+    
+    //     const cartItemId = payment.cartItemId; 
+    
+    //     if (!cartItemId) {
+    //       throw new Error('No cart item ID provided');
+    //     }
+    
+    //     const deleteResult = await cartCollection.deleteOne({
+    //       _id: new ObjectId(cartItemId)
+    //     });
+    
+    //     if (deleteResult.deletedCount === 0) {
+    //       throw new Error('Cart item not found');
+    //     }
+    //     res.send({ insertResult, deleteResult });
+    //   } catch (error) {
+    //     res.status(500).send({ error: error.message });
+    //   }
+    // })
+
     app.post('/payments', verifyJWT, async (req, res) => {
       try {
         const payment = req.body;
@@ -405,17 +429,27 @@ async function run() {
         }
     
         const deleteResult = await cartCollection.deleteOne({
-          _id: ObjectId(cartItemId)
+          _id: new ObjectId(cartItemId)
         });
     
         if (deleteResult.deletedCount === 0) {
           throw new Error('Cart item not found');
         }
-        res.send({ insertResult, deleteResult });
+    
+        // Increase enrolled_student count in courseCollection
+        const courseId = payment.classItemId; // Assuming courseId is provided in the payment request
+        const courseQuery = { _id: new ObjectId(courseId) };
+        const updateResult = await courseCollection.updateOne(courseQuery, { $inc: { total_enrolled_student: 1 } });
+    
+        if (updateResult.modifiedCount === 0) {
+          throw new Error('Failed to update enrolled_student count');
+        }
+    
+        res.send({ insertResult, deleteResult, updateResult });
       } catch (error) {
         res.status(500).send({ error: error.message });
       }
-    })
+    });
     
     
 
